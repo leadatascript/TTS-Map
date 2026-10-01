@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trip Distribution GUI</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+html, body { margin:0; padding:0; height:100%; font-family:'Segoe UI',Arial,sans-serif; background:#f0f2f5; }
+#controls { padding:15px; background:#2c3e50; color:white; display:flex; flex-direction:column; gap:12px; box-shadow:0 4px 10px rgba(0,0,0,.3); z-index:1000; overflow-x:auto; overflow-y:hidden; }
+.control-row { display:flex; flex-wrap:nowrap; gap:15px; align-items:flex-end; width:max-content; min-width:100%; }
+#map { height:calc(100% - 190px); width:100%; }
+.input-group { display:flex; flex-direction:column; gap:4px; min-width:120px; flex-shrink:0; }
+.input-group.compact-col { min-width:82px; }
+.input-group.compact-col input { width:58px !important; }
+.input-group.filename-group { min-width:165px; }
+.input-group.filename-group input { min-width:150px !important; width:150px; }
+label { font-size:.65rem; font-weight:bold; color:#bdc3c7; text-transform:uppercase; }
+input { padding:6px; border-radius:4px; border:1px solid #34495e; font-size:.85rem; }
+.button-cluster { display:flex; gap:8px; margin-left:auto; flex-wrap:nowrap; flex-shrink:0; }
+.btn { padding:10px 18px; border:none; border-radius:4px; cursor:pointer; font-weight:bold; color:white; transition:.2s; white-space:nowrap; }
+#filter-btn { background:#3498db; } #load-assignments-btn { background:#8e44ad; } #apply-btn { background:#f39c12; } #export-btn { background:#27ae60; } #gmaps-config-btn { background:#16a085; } #gateway-testing-btn { background:#9b59b6; } #help-btn { background:#34495e; }
+.btn:hover { opacity:.8; transform:translateY(-1px); }
+#status-bar { position:absolute; bottom:20px; left:20px; background:rgba(255,255,255,.95); padding:12px 18px; border-radius:5px; z-index:1000; box-shadow:0 2px 8px rgba(0,0,0,.15); font-size:.85rem; border-left:5px solid #3498db; display:flex; gap:20px; }
+#legend { position:absolute; top:var(--floating-panel-top, 150px); right:20px; background:rgba(255,255,255,.95); padding:15px; border-radius:5px; z-index:1000; box-shadow:0 2px 8px rgba(0,0,0,.15); font-size:.85rem; min-width:220px; max-width:300px; max-height:400px; overflow-y:auto; }
+.legend-header { font-weight:bold; margin-bottom:10px; border-bottom:1px solid #ddd; padding-bottom:4px; color:#2c3e50; }
+.legend-item { margin-bottom:12px; padding-bottom:8px; border-bottom:1px dashed #ecf0f1; }
+.legend-item:last-child { border-bottom:none; }
+.legend-gw { display:flex; align-items:center; justify-content:space-between; width:100%; font-size:.85rem; color:#2c3e50; }
+.legend-gw-left { display:flex; align-items:center; gap:8px; }
+.legend-swatch { width:14px; height:14px; border-radius:3px; flex-shrink:0; }
+.legend-details { margin:2px 0 0 22px; font-size:.85rem; color:#2c3e50; line-height:1.4; }
+.remove-btn { background:#e74c3c; color:white; border:none; border-radius:3px; cursor:pointer; font-size:.6rem; padding:2px 5px; transition:background .2s; margin-left:10px; }
+.remove-btn:hover { background:#c0392b; }
+.stat-item { display:flex; flex-direction:column; } .stat-label { font-size:.65rem; color:#7f8c8d; text-transform:uppercase; font-weight:bold; } .stat-value { font-size:1.1rem; color:#2c3e50; font-weight:bold; }
+.legend-edit-input { width:calc(100% - 12px); margin:3px 0; padding:4px; font-size:.8rem; }
+.legend-action-btn { background:#34495e; color:white; border:none; border-radius:3px; cursor:pointer; font-size:.65rem; padding:3px 7px; margin-top:5px; }
+.legend-action-btn:hover { background:#2c3e50; }
+.legend-select-stack { display:flex; flex-direction:column; align-items:center; gap:4px; }
+.legend-edit-checkbox { cursor:pointer; width:14px; height:14px; }
+.zone-label { background:rgba(255,255,255,.85); border:1px solid #2c3e50; border-radius:3px; color:#2c3e50; font-weight:bold; font-size:.7rem; padding:1px 3px; box-shadow:0 1px 3px rgba(0,0,0,.25); }
+#gmaps-mode-bar { position:absolute; top:150px; left:20px; background:rgba(22,160,133,.95); color:white; padding:10px 14px; border-radius:5px; z-index:1001; box-shadow:0 2px 8px rgba(0,0,0,.2); font-size:.85rem; display:none; gap:12px; align-items:center; }
+#gmaps-exit-btn { background:#c0392b; color:white; border:none; border-radius:3px; cursor:pointer; padding:4px 8px; font-weight:bold; }
+.gmaps-mode-toggle { display:flex; align-items:center; gap:4px; color:white; font-weight:bold; font-size:.78rem; white-space:nowrap; }
+.gmaps-mode-toggle input { margin:0 3px 0 0; width:14px; height:14px; cursor:pointer; }
+#gmaps-modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:2000; display:none; align-items:center; justify-content:center; }
+#gmaps-modal { background:white; color:#2c3e50; width:420px; max-width:calc(100% - 40px); border-radius:8px; box-shadow:0 6px 24px rgba(0,0,0,.35); padding:18px; font-size:.9rem; }
+#gmaps-modal h3 { margin:0 0 12px 0; color:#2c3e50; }
+.gmaps-modal-row { margin:10px 0; }
+.gmaps-modal-row label { color:#2c3e50; font-size:.75rem; }
+#gmaps-routing-location { width:calc(100% - 16px); margin-top:4px; }
+.gmaps-toggle-label { display:block; color:#2c3e50; font-size:.85rem; text-transform:none; margin:8px 0; }
+.gmaps-modal-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:14px; }
+.gmaps-modal-btn { border:none; border-radius:4px; cursor:pointer; padding:8px 12px; font-weight:bold; }
+#gmaps-enable-btn { background:#16a085; color:white; } #gmaps-cancel-btn { background:#7f8c8d; color:white; } #gmaps-modal-close { float:right; background:#e74c3c; color:white; border:none; border-radius:3px; cursor:pointer; font-weight:bold; }
+#help-modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:2100; display:none; align-items:center; justify-content:center; }
+#help-modal { background:white; color:#2c3e50; width:760px; max-width:calc(100% - 40px); max-height:calc(100% - 70px); overflow-y:auto; border-radius:8px; box-shadow:0 6px 24px rgba(0,0,0,.35); padding:20px; font-size:.9rem; line-height:1.45; }
+#help-modal h2 { margin:0 0 12px 0; color:#2c3e50; }
+#help-modal h3 { margin:18px 0 8px 0; color:#2c3e50; border-bottom:1px solid #ecf0f1; padding-bottom:4px; }
+#help-modal ul { margin-top:6px; padding-left:22px; }
+#help-modal li { margin:5px 0; }
+#help-modal-close { float:right; background:#e74c3c; color:white; border:none; border-radius:3px; cursor:pointer; font-weight:bold; padding:4px 8px; }
+.help-note { background:#ecf9ff; border-left:4px solid #3498db; padding:8px 10px; margin:10px 0; }
+.help-warning { background:#fff8e6; border-left:4px solid #f39c12; padding:8px 10px; margin:10px 0; }
+
+
+#gateway-mode-bar { position:absolute; top:150px; left:20px; background:rgba(155,89,182,.96); color:white; padding:10px 14px; border-radius:5px; z-index:1001; box-shadow:0 2px 8px rgba(0,0,0,.2); font-size:.85rem; display:none; gap:10px; align-items:center; flex-wrap:wrap; max-width:min(90vw,700px); }
+#gateway-mode-text { font-weight:bold; }
+.gateway-mode-btn { border:none; border-radius:4px; cursor:pointer; padding:6px 10px; font-weight:bold; color:white; }
+#gateway-manage-btn, #gateway-show-vis-btn, #gateway-cancel-define-btn { background:#34495e; }
+#gateway-exit-btn { background:#c0392b; }
+#gateway-show-vis-btn[disabled] { opacity:.55; cursor:not-allowed; }
+#gateway-modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:2050; display:none; align-items:center; justify-content:center; }
+#gateway-modal { background:white; color:#2c3e50; width:500px; max-width:calc(100% - 40px); border-radius:8px; box-shadow:0 6px 24px rgba(0,0,0,.35); padding:18px; font-size:.9rem; }
+#gateway-modal h3 { margin:0 0 12px 0; color:#2c3e50; }
+#gateway-modal-close { float:right; background:#e74c3c; color:white; border:none; border-radius:3px; cursor:pointer; font-weight:bold; }
+.gateway-modal-row { margin:10px 0; }
+.gateway-modal-row label { color:#2c3e50; font-size:.75rem; }
+#gateway-modal-select { width:100%; margin-top:4px; padding:7px 8px; font-size:.9rem; }
+#gateway-selected-status, #gateway-completion-status { line-height:1.45; color:#2c3e50; }
+.gateway-modal-note { background:#f6f8fa; border-left:4px solid #9b59b6; padding:8px 10px; margin:10px 0; }
+.gateway-modal-warning { background:#fff8e6; border-left:4px solid #f39c12; padding:8px 10px; margin:10px 0; }
+#gateway-define-btn { background:#9b59b6; color:white; }
+#gateway-clear-definition-btn { background:#7f8c8d; color:white; }
+#gateway-finished-btn { background:#16a085; color:white; }
+#gateway-modal-ok-btn { background:#34495e; color:white; }
+#gateway-modal-exit-btn { background:#c0392b; color:white; }
+.gateway-segment-label { background:rgba(255,255,255,.95); border:1px solid #2c3e50; border-radius:3px; color:#2c3e50; font-weight:bold; font-size:.72rem; padding:1px 4px; }
+
+
+#gateway-stats-btn { background:#34495e; color:white; }
+#gateway-stats-btn[disabled] { opacity:.55; cursor:not-allowed; }
+.gateway-mode-toggle-inline { display:flex; align-items:center; gap:4px; color:white; font-weight:bold; font-size:.78rem; white-space:nowrap; }
+.gateway-mode-toggle-inline input { margin:0 3px 0 0; width:14px; height:14px; cursor:pointer; }
+#gateway-stats-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:2055; display:none; align-items:center; justify-content:center; }
+#gateway-stats-modal { background:white; color:#2c3e50; width:480px; max-width:calc(100% - 40px); border-radius:8px; box-shadow:0 6px 24px rgba(0,0,0,.35); padding:18px; font-size:.9rem; }
+#gateway-stats-modal h3 { margin:0 0 12px 0; color:#2c3e50; }
+#gateway-stats-close { float:right; background:#e74c3c; color:white; border:none; border-radius:3px; cursor:pointer; font-weight:bold; }
+#gateway-stats-table { width:100%; border-collapse:collapse; margin-top:10px; }
+#gateway-stats-table th, #gateway-stats-table td { border:1px solid #dde3e8; padding:8px 10px; text-align:left; }
+#gateway-stats-table th { background:#f6f8fa; }
+#gateway-stats-empty { color:#555; margin-top:8px; }
+
+.site-location-tooltip { background:rgba(255,255,255,.96); border:1px solid #16a085; border-radius:4px; color:#2c3e50; font-weight:bold; font-size:.75rem; padding:2px 5px; }
+
+#group-share-btn { background:#9b59b6; color:white; }
+#group-share-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:2060; display:none; align-items:center; justify-content:center; }
+#group-share-modal { background:white; color:#2c3e50; width:760px; max-width:calc(100% - 40px); max-height:calc(100% - 80px); overflow-y:auto; border-radius:8px; box-shadow:0 6px 24px rgba(0,0,0,.35); padding:18px; font-size:.9rem; }
+#group-share-modal h3 { margin:0 0 12px 0; color:#2c3e50; }
+#group-share-close { float:right; background:#e74c3c; color:white; border:none; border-radius:3px; cursor:pointer; font-weight:bold; }
+.group-share-block { border:1px solid #dde3e8; border-radius:6px; padding:10px 12px; margin:10px 0; background:#fafbfc; }
+.group-share-title { font-weight:bold; margin-bottom:6px; }
+.group-share-subtitle { font-size:.82rem; color:#555; margin-bottom:8px; }
+.group-share-row { display:grid; grid-template-columns:minmax(200px,1fr) 120px; gap:12px; align-items:center; margin:6px 0; }
+.group-share-row input { width:100%; box-sizing:border-box; }
+.group-share-note { background:#f6f8fa; border-left:4px solid #9b59b6; padding:8px 10px; margin:10px 0; }
+.group-share-warning { background:#fff8e6; border-left:4px solid #f39c12; padding:8px 10px; margin:10px 0; }
+.group-share-readonly { background:#eef2f5; color:#555; }
+
+</style>
+</head>
+<body>
+<div id="controls">
+  <div class="control-row">
+    <div class="input-group"><label>1. GeoJSON</label><input type="file" id="geojson-input" accept=".geojson"></div>
+    <div class="input-group"><label>2. Filter CSV</label><input type="file" id="csv-filter-input" accept=".csv"></div>
+    <div class="input-group compact-col"><label>Start Row</label><input type="number" id="start-row" value="1" style="width:70px;"></div>
+    <div class="input-group compact-col"><label>Zone Column</label><input type="text" id="zone-col" value="A" placeholder="e.g. A" style="width:70px; text-transform:uppercase;"></div>
+    <div class="input-group compact-col"><label>Input Column (Direction)</label><input type="text" id="direction-col" value="" placeholder="e.g. D" style="width:70px; text-transform:uppercase;"></div>
+    <div class="input-group compact-col"><label>Input Column (Gateway)</label><input type="text" id="gateway-col" value="" placeholder="e.g. E" style="width:70px; text-transform:uppercase;"></div>
+    <div class="input-group compact-col"><label>Input Column (Trip)</label><input type="text" id="trip-col" value="" placeholder="e.g. F" style="width:70px; text-transform:uppercase;"></div>
+    <div class="input-group compact-col"><label>Output Column (Direction)</label><input type="text" id="target-col" value="" placeholder="e.g. B" style="width:70px; text-transform:uppercase;"></div>
+    <div class="input-group" style="min-width:235px;">
+      <label>Site Location (Latitude, Longitude)</label>
+      <input type="text" id="site-location-input" placeholder="e.g. 43.882840, -79.440280" style="min-width:220px; width:220px;">
+      <label style="font-size:.75rem; color:white; text-transform:uppercase; font-weight:bold;"><input type="checkbox" id="show-site-location" style="margin-right:6px;">SHOW SITE LOCATION</label>
+    </div>
+    <div class="input-group" style="min-width:160px;">
+      <label style="font-size:.75rem; color:white; text-transform:uppercase; font-weight:bold;"><input type="checkbox" id="overwrite-loaded-cols" style="margin-right:6px;">OVERWRITE COLUMNS</label>
+      <label style="font-size:.75rem; color:white; text-transform:uppercase; font-weight:bold;"><input type="checkbox" id="show-zone-labels" style="margin-right:6px;">SHOW ZONE LABELS</label>
+      <label style="font-size:.75rem; color:white; text-transform:uppercase; font-weight:bold;"><input type="checkbox" id="export-by-gateways" style="margin-right:6px;">TRIP DISTRIBUTION BY GATEWAYS</label>
+    </div>
+    <div class="input-group filename-group"><label>Output Filename</label><input type="text" id="filename-input" value="Trip Distribution Results" style="min-width:200px;"></div>
+  </div>
+  <div class="control-row">
+    <div class="input-group"><label>Direction</label><input type="text" id="Direction-input" placeholder="e.g. N"></div>
+    <div class="input-group"><label>Gateway</label><input type="text" id="Gateway-input" placeholder="e.g. Lester NB"></div>
+    <div class="button-cluster">
+      <button class="btn" id="filter-btn">Filter Map</button>
+      <button class="btn" id="load-assignments-btn">Load Assignments</button>
+      <button class="btn" id="apply-btn">Apply Selection</button>
+      <button class="btn" id="gmaps-config-btn">Google Maps URL Integration</button>
+      <button class="btn" id="gateway-testing-btn">Gateway Testing Mode</button>
+      <button class="btn" id="help-btn">Help</button>  
+      <button class="btn" id="export-btn">Final Export</button>
+    </div>
+  </div>
+</div>
+
+<div id="gmaps-mode-bar">
+  <span id="gmaps-mode-text">Google Maps URL Integration mode active</span>
+  <label class="gmaps-mode-toggle"><input type="checkbox" id="gmaps-mode-point-random" checked>Random point</label>
+  <label class="gmaps-mode-toggle"><input type="checkbox" id="gmaps-mode-point-click">Clicked point</label>
+  <button id="gmaps-exit-btn">Exit Google Maps Mode</button>
+</div>
+<div id="gateway-mode-bar">
+  <span id="gateway-mode-text">Gateway Testing Mode active</span>
+  <button id="gateway-manage-btn" class="gateway-mode-btn">Manage Gateways</button>
+  <button id="gateway-show-vis-btn" class="gateway-mode-btn">Show Visualization</button>
+  <button id="gateway-stats-btn" class="gateway-mode-btn">Gateway Statistics</button>
+  <label class="gateway-mode-toggle-inline"><input type="checkbox" id="gateway-show-labels-toggle">Show gateway labels</label>
+  <button id="gateway-cancel-define-btn" class="gateway-mode-btn" style="display:none;">Cancel Definition</button>
+  <button id="gateway-exit-btn" class="gateway-mode-btn">Exit Gateway Testing Mode</button>
+</div>
+<div id="gmaps-modal-backdrop">
+  <div id="gmaps-modal">
+    <button id="gmaps-modal-close" title="Close">×</button>
+    <h3>Google Maps URL Integration</h3>
+    <div class="gmaps-modal-row">
+      <label id="gmaps-routing-location-label">Location for routing</label>
+      <input type="text" id="gmaps-routing-location" placeholder="Address or lat,lng e.g. 101 Town Centre Blvd, Markham">
+    </div>
+    <div class="gmaps-modal-row">
+      <label class="gmaps-toggle-label"><input type="checkbox" id="gmaps-zone-origin"> Use selected zone as Origin</label>
+      <label class="gmaps-toggle-label"><input type="checkbox" id="gmaps-zone-destination"> Use selected zone as Destination</label>
+    </div>
+    <div class="gmaps-modal-row">
+      <label>Route options</label>
+      <label class="gmaps-toggle-label"><input type="checkbox" id="gmaps-avoid-tolls"> Avoid tolls</label>
+      <label class="gmaps-toggle-label"><input type="checkbox" id="gmaps-avoid-highways"> Avoid highways</label>
+      <label class="gmaps-toggle-label"><input type="checkbox" id="gmaps-avoid-ferries"> Avoid ferries</label>
+    </div>
+    <div class="gmaps-modal-row" style="font-size:.78rem; color:#555; line-height:1.35;">When active, clicking any zone will generate a random point inside that zone and open a Google Maps driving directions URL.</div>
+    <div class="gmaps-modal-actions"><button class="gmaps-modal-btn" id="gmaps-cancel-btn">Cancel</button><button class="gmaps-modal-btn" id="gmaps-enable-btn">Enable Mode</button></div>
+  </div>
+</div>
+
+
+<div id="gateway-modal-backdrop">
+  <div id="gateway-modal">
+    <button id="gateway-modal-close" title="Close">×</button>
+    <h3>Gateway Testing Setup</h3>
+    <div class="gateway-modal-row">
+      <label for="gateway-modal-select">Gateway to define or edit</label>
+      <select id="gateway-modal-select"></select>
+    </div>
+    <div class="gateway-modal-row" id="gateway-selected-status">No gateway selected.</div>
+    <div class="gateway-modal-note">
+      Click <strong>Define / Redefine on Map</strong>, then click the map once to set the gateway point. Centroid-to-gateway lines connect directly to that gateway point.
+    </div>
+    <div class="gateway-modal-row" id="gateway-completion-status"></div>
+    <div class="gateway-modal-warning">
+      Click <strong>Finished Defining Gateways</strong> only when you want the tool to check all required gateways and display the gateway testing visualization.
+    </div>
+    <div class="gmaps-modal-actions">
+      <button class="gmaps-modal-btn" id="gateway-modal-ok-btn">OK</button>
+      <button class="gmaps-modal-btn" id="gateway-define-btn">Define / Redefine on Map</button>
+      <button class="gmaps-modal-btn" id="gateway-clear-definition-btn">Clear Definition</button>
+      <button class="gmaps-modal-btn" id="gateway-finished-btn">Finished Defining Gateways</button>
+      <button class="gmaps-modal-btn" id="gateway-modal-exit-btn">Exit Mode</button>
+    </div>
+  </div>
+</div>
+<div id="gateway-stats-backdrop">
+  <div id="gateway-stats-modal">
+    <button id="gateway-stats-close" title="Close">×</button>
+    <h3>Gateway Statistics</h3>
+    <div id="gateway-stats-empty">Gateway statistics will appear here when gateway totals can be calculated.</div>
+    <table id="gateway-stats-table" style="display:none;">
+      <thead><tr><th>Gateway</th><th>Assigned Zones</th><th>Total Trips</th></tr></thead>
+      <tbody id="gateway-stats-tbody"></tbody>
+    </table>
+    <div class="gmaps-modal-actions">
+      <button class="gmaps-modal-btn" id="group-share-btn">Edit Grouping %s</button>
+      <button class="gmaps-modal-btn" id="gateway-stats-ok-btn">OK</button>
+    </div>
+  </div>
+</div>
+<div id="group-share-backdrop">
+  <div id="group-share-modal">
+    <button id="group-share-close" title="Close">×</button>
+    <h3>Edit Grouping Percentages</h3>
+    <div class="group-share-note">For groups with multiple gateways, edit the percentage of trips assigned to each gateway. Each grouping must total <strong>100%</strong>. Single-gateway groups are fixed at <strong>100%</strong>.</div>
+    <div class="group-share-warning">These percentages affect Gateway Statistics, gateway visualization weighting, gateway-to-site flows, and TRIP DISTRIBUTION BY GATEWAYS export calculations.</div>
+    <div id="group-share-content"></div>
+    <div class="gmaps-modal-actions">
+      <button class="gmaps-modal-btn" id="group-share-cancel-btn">Cancel</button>
+      <button class="gmaps-modal-btn" id="group-share-save-btn">Save Percentages</button>
+    </div>
+  </div>
+</div>
+<div id="help-modal-backdrop">
+  <div id="help-modal">
+    <button id="help-modal-close" title="Close">×</button>
+    <h2>Trip Distribution GUI Help</h2>
+    <div class="help-note">
+      This interface lets you load zone polygons, filter visible zones with a CSV, create/edit Direction + Gateway groupings, import/export assignments, show zone labels, optionally launch Google Maps directions from selected zones, and run Gateway Testing Mode with weighted trip visualization.
+    </div>
+    <h3>Required files</h3>
+    <ul>
+      <li><strong>1. GeoJSON:</strong> Upload the zone boundary polygon file. Only <strong>.geojson</strong> files are accepted. The tool uses the first GeoJSON property value as the zone ID displayed on the map.</li>
+      <li><strong>2. Filter CSV:</strong> Upload the CSV containing zone IDs and, if applicable, existing Direction/Gateway assignments and trip values. Only <strong>.csv</strong> files are accepted.</li>
+    </ul>
+    <h3>Column and row inputs</h3>
+    <ul>
+      <li><strong>Start Row:</strong> The first CSV row containing actual zone records. If row 1 is headers, use 2.</li>
+      <li><strong>Zone Column:</strong> The CSV column containing zone IDs. Use Excel-style letters such as A, B, C.</li>
+      <li><strong>Input Column (Direction):</strong> The CSV column containing existing Direction values when using Load Assignments.</li>
+      <li><strong>Input Column (Gateway):</strong> The CSV column containing existing Gateway values when using Load Assignments. Multiple gateways are allowed in one cell when they are comma-separated.</li>
+      <li><strong>Input Column (Trip):</strong> The CSV column containing the trip value used by Gateway Testing Mode to weight centroid-to-gateway lines and gateway totals.</li>
+      <li><strong>Output Column (Direction):</strong> The CSV column where Direction should be written during Final Export. In the default export, Gateway is written to the next column. In Trip Distribution by Gateways export mode, one gateway output column is created for every unique gateway beginning in the next column.</li>
+      <li><strong>Output Filename:</strong> The name used for the downloaded export CSV.</li>
+      <li><strong>Site Location (Latitude, Longitude):</strong> Optional project/site coordinates entered in <strong>latitude, longitude</strong> format (for example, <strong>43.882840, -79.440280</strong>). This is a coordinate-only field; it does not geocode addresses. If provided, it becomes the default routing location in Google Maps URL Integration.</li>
+    </ul>
+    <h3>Main toggles</h3>
+    <ul>
+      <li><strong>OVERWRITE COLUMNS:</strong> When checked, Final Export writes back into the same Direction/Gateway columns that were loaded with Load Assignments. This only works after assignments have been loaded from the CSV. This applies to the standard export only.</li>
+      <li><strong>SHOW ZONE LABELS:</strong> Shows or hides zone ID labels on the map polygons.</li>
+      <li><strong>SHOW SITE LOCATION:</strong> Displays or hides the Site Location marker on the map when valid coordinates are entered.</li>
+      <li><strong>TRIP DISTRIBUTION BY GATEWAYS:</strong> Changes Final Export so the output includes one Direction column and one additional output column per unique gateway with decimal shares (for example, 0.5 = 50%). A warning is shown before exporting because this is an analyst-support approximation that should be verified.</li>
+    </ul>
+    <h3>Creating new groups</h3>
+    <ul>
+      <li><strong>Direction:</strong> Enter the Direction value for a new group, such as N, S, EB, or WB.</li>
+      <li><strong>Gateway:</strong> Enter the Gateway name for a new group. Multiple gateways can be entered in one group by separating them with commas.</li>
+      <li><strong>Apply Selection:</strong> After clicking unassigned zones on the map, this creates or updates a Direction + Gateway group.</li>
+      <li>When a group contains multiple gateways, trips are split evenly across those gateways for Gateway Testing Mode visualization and for the optional gateway distribution export.</li>
+    </ul>
+    <h3>Buttons</h3>
+    <ul>
+      <li><strong>Filter Map:</strong> Uses the Filter CSV and Zone Column to show only matching zones on the map.</li>
+      <li><strong>Load Assignments:</strong> Reads existing Direction/Gateway assignments from the CSV and rebuilds the Applied Selections legend.</li>
+      <li><strong>Apply Selection:</strong> Assigns currently selected map zones to the Direction + Gateway entered in the input boxes.</li>
+      <li><strong>Google Maps URL Integration:</strong> Opens the Google Maps setup popup. If Site Location coordinates are provided, they are used as the default routing location. After enabled, clicking zones opens Google Maps directions.</li>
+      <li><strong>Gateway Testing Mode:</strong> Activates a separate gateway-testing workflow. A small active-mode bar stays on screen, while gateway setup is handled through a popup similar to Google Maps mode.</li>
+      <li><strong>Final Export:</strong> Downloads the CSV with Direction and Gateway values written to the selected output columns, or the gateway share export when that toggle is selected.</li>
+    </ul>
+    <h3>Applied Selections legend</h3>
+    <ul>
+      <li>Each group receives a color and appears in the Applied Selections legend.</li>
+      <li>The checkbox beside a legend item selects that group for editing on the map.</li>
+      <li>When a group is active, clicking one of its zones removes the zone from the group.</li>
+      <li>When a group is active, clicking an unassigned zone adds the zone to that group.</li>
+      <li>The red <strong>✖</strong> removes the entire group.</li>
+      <li><strong>Rename</strong> lets you edit the group's Direction and Gateway directly in the legend, then save the changes.</li>
+    </ul>
+    <h3>Gateway Testing Mode</h3>
+    <ul>
+      <li>Use the <strong>Gateway Testing Mode</strong> button to activate the mode. It has its own mode bar and temporarily repurposes map clicks for gateway point definition instead of zone editing.</li>
+      <li>Every unique gateway currently referenced by the groups must be defined with a gateway point before gateway testing is complete.</li>
+      <li>Gateway definitions are created with a <strong>single click</strong> on the map.</li>
+      <li>Centroid-to-gateway lines connect from each zone centroid directly to the selected gateway point.</li>
+      <li>Centroid-to-gateway lines use the group color and are weighted by trip share using the values from <strong>Input Column (Trip)</strong>.</li>
+      <li>If the same gateway appears in more than one group, gateway trips are aggregated. The gateway point size reflects the combined total.</li>
+      <li>If a Site Location has been defined and <strong>SHOW SITE LOCATION</strong> is turned on, the visualization also draws lines from each gateway point to the Site Location, weighted by the total trips assigned to that gateway.</li>
+      <li>You can clear an individual gateway definition from the mode bar and redefine it at any time.</li>
+      <li>You may exit Gateway Testing Mode without defining every gateway if you choose, but the mode will continue warning you about any undefined gateways while active.</li>
+    </ul>
+    <h3>Google Maps URL Integration</h3>
+    <ul>
+      <li><strong>Use selected zone as Origin:</strong> The zone-side point becomes the Google Maps route origin. The typed location becomes the destination.</li>
+      <li><strong>Use selected zone as Destination:</strong> The zone-side point becomes the Google Maps route destination. The typed location becomes the origin.</li>
+      <li><strong>Location input:</strong> Enter coordinates in <strong>latitude, longitude</strong> format. If the Site Location field has been filled in on the main interface, those coordinates will be reused here by default.</li>
+      <li>If you change the routing coordinates in the Google Maps popup away from the defined Site Location, the tool will show a caution that you are overriding the Site Location for that routing action.</li>
+      <li><strong>Avoid tolls / highways / ferries:</strong> Adds Google Maps URL avoid options to the route request.</li>
+      <li><strong>Random point:</strong> Uses a random point inside the clicked zone polygon.</li>
+      <li><strong>Clicked point:</strong> Uses the exact map point you clicked inside the zone.</li>
+      <li><strong>Exit Google Maps Mode:</strong> Leaves Google Maps mode and returns map clicks to normal zone selection/editing behavior.</li>
+    </ul>
+    <div class="help-warning">
+      In Google Maps mode and Gateway Testing Mode, map clicks do not assign or edit groups. Exit the active mode to return to normal editing.
+    </div>
+    <div class="help-warning">
+      If an error message is displayed in the map interface, try opening the tool in a different web browser.
+    </div>
+  </div>
+</div>
+<div id="status-bar"><div class="stat-item"><span class="stat-label">Total Zones</span><span id="total-count" class="stat-value">0</span></div><div class="stat-item"><span class="stat-label">Selected Zones</span><span id="selected-count" class="stat-value">0</span></div></div>
+<div id="legend"><div class="legend-header">Applied Selections</div><div id="legend-content"></div></div>
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script>
+const map = L.map('map').setView([43.6532, -79.3832], 11);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' }).addTo(map);
+let geoJsonLayer=null, masterData=null, selectionBatches=[];
+let totalSelectionCount=0, batchCounter=1, colorIndex=0;
+let activeBatchId=null, renamingBatchId=null;
+let assignmentsLoadedFromCsv=false, loadedDirectionColIdx=null, loadedGatewayColIdx=null;
+let googleMapsMode=false, googleMapsZoneRole=null, googleMapsRoutingLocation='', googleMapsAvoidOptions=[];
+let googleMapsPointMode='random';
+let siteLocationRaw='';
+let siteLocationLatLng=null;
+let siteLocationMarker=null;
+let gatewayTestingMode=false;
+let gatewayVisualizationActive=false;
+let gatewayCaptureActive=false;
+let gatewayShowLabels=false;
+let gatewayStatsData=[];
+let gatewayDefinitions={};
+let gatewayDefinitionDraft={ gatewayName:'', point:null, tempLayer:null };
+let zoneLayerById=new Map();
+let zoneTripMapCache=null;
+const gatewaySegmentLayerGroup=L.layerGroup().addTo(map);
+const gatewayFlowLayerGroup=L.layerGroup().addTo(map);
+const gatewaySiteFlowLayerGroup=L.layerGroup().addTo(map);
+// Using the exact 12-color ramp requested by the user.
+const presetColors=['#a6cee3','#1f78b4','#b2df8a','#33a02c','#fb9a99','#e31a1c','#fdbf6f','#ff7f00','#cab2d6','#6a3d9a','#ffff99','#b15928'];
+const styles={ default:{color:'#2c3e50',weight:1,fillOpacity:.3,fillColor:'#34495e'}, selected:{color:'#e67e22',weight:2,fillOpacity:.6,fillColor:'#e67e22'}, completed:(color)=>({color:'#2c3e50',weight:1,fillOpacity:.7,fillColor:color}) };
+function colToIdx(letter){let column=0;let str=(letter||'').toUpperCase().trim();for(let i=0;i<str.length;i++){column=column*26+(str.charCodeAt(i)-64);}return column-1;}
+function updateSelectedCounter(){document.getElementById('selected-count').innerText=totalSelectionCount;}
+function updateFloatingPanelOffsets(){const controls=document.getElementById('controls');if(!controls)return;const controlsBottom=controls.getBoundingClientRect().bottom;document.documentElement.style.setProperty('--floating-panel-top', `${Math.ceil(controlsBottom+20)}px`);}updateFloatingPanelOffsets();window.addEventListener('resize', updateFloatingPanelOffsets);if('ResizeObserver' in window){new ResizeObserver(updateFloatingPanelOffsets).observe(document.getElementById('controls'));}
+const controlsEl=document.getElementById('controls');controlsEl.addEventListener('wheel', e=>{if(controlsEl.scrollWidth<=controlsEl.clientWidth)return;e.preventDefault();controlsEl.scrollLeft += e.deltaY + e.deltaX;}, { passive:false });
+function getBatchForZone(zoneId){return selectionBatches.find(batch=>batch.zones.includes(zoneId));}
+function getZoneColIdx(){const zoneLetter=document.getElementById('zone-col').value.trim()||'A';const zoneIdx=colToIdx(zoneLetter);if(zoneIdx<0){alert('Zone Column must be a valid Excel-style column letter, such as A.');return null;}return zoneIdx;}
+function getTripColIdx(requireValue=false){const tripLetter=document.getElementById('trip-col').value.trim();if(!tripLetter){if(requireValue)alert('Enter "Input Column (Trip)" before using Gateway Testing Mode.');return null;}const tripIdx=colToIdx(tripLetter);if(tripIdx<0){alert('Input Column (Trip) must be a valid Excel-style column letter, such as F.');return null;}return tripIdx;}
+function validateFileExtension(inputEl, allowedExtensions, friendlyName){const file=inputEl.files&&inputEl.files[0];if(!file)return false;const lowerName=file.name.toLowerCase();const isAllowed=allowedExtensions.some(ext=>lowerName.endsWith(ext));if(!isAllowed){alert(`${friendlyName} file must be ${allowedExtensions.join(' or ')}. Please select the correct file type.`);inputEl.value='';return false;}return true;}
+function cellHasData(row,idx){return row&&row[idx]!==undefined&&String(row[idx]).trim()!=='';}
+function getDirectionGatewayColumns(){const directionLetter=document.getElementById('direction-col').value.trim();const gatewayLetter=document.getElementById('gateway-col').value.trim();if(!directionLetter||!gatewayLetter){alert('Enter "Input Column (Direction)" and Gateway Column before loading assignments.');return null;}const directionIdx=colToIdx(directionLetter), gatewayIdx=colToIdx(gatewayLetter);if(directionIdx<0||gatewayIdx<0){alert('Direction Column and Gateway Column must be valid Excel-style letters, such as D and E.');return null;}return{directionIdx,gatewayIdx};}
+function parseGatewayNames(gatewayText){const seen=new Set();return String(gatewayText||'').split(',').map(v=>v.trim()).filter(Boolean).filter(name=>{const key=name.toLowerCase();if(seen.has(key))return false;seen.add(key);return true;});}
+function getReferencedGatewayNames(){const seen=new Set();const names=[];selectionBatches.forEach(batch=>{parseGatewayNames(batch.gateway).forEach(name=>{const key=name.toLowerCase();if(!seen.has(key)){seen.add(key);names.push(name);}});});return names;}
+function getUndefinedGatewayNames(){return getReferencedGatewayNames().filter(name=>!(gatewayDefinitions[name]&&gatewayDefinitions[name].point));}
+function parseTripValue(val){if(val===null||val===undefined)return 0;const cleaned=String(val).trim().replace(/,/g,'');if(cleaned==='')return 0;const num=Number(cleaned);return Number.isFinite(num)?num:0;}
+function getSiteLocationRaw(){return document.getElementById('site-location-input').value.trim();}
+function parseSiteLocation(textValue){const raw=String(textValue||'').trim();if(!raw)return null;const parts=raw.split(',').map(v=>v.trim());if(parts.length!==2)return null;const lat=Number(parts[0]),lng=Number(parts[1]);if(!Number.isFinite(lat)||!Number.isFinite(lng))return null;if(lat<-90||lat>90||lng<-180||lng>180)return null;return{lat,lng};}
+function refreshSiteLocationState(){siteLocationRaw=getSiteLocationRaw();siteLocationLatLng=parseSiteLocation(siteLocationRaw);}
+function clearSiteLocationMarker(){if(siteLocationMarker){map.removeLayer(siteLocationMarker);siteLocationMarker=null;}}
+function shouldShowSiteLocation(){return !!document.getElementById('show-site-location').checked;}
+function updateSiteLocationMarker(focus=false){refreshSiteLocationState();clearSiteLocationMarker();if(!shouldShowSiteLocation()||!siteLocationLatLng)return;siteLocationMarker=L.marker([siteLocationLatLng.lat,siteLocationLatLng.lng]).addTo(map);siteLocationMarker.bindTooltip('Site Location',{permanent:true,direction:'top',className:'site-location-tooltip',opacity:1});siteLocationMarker.bindPopup(`Site Location<br>${siteLocationLatLng.lat.toFixed(6)}, ${siteLocationLatLng.lng.toFixed(6)}`);if(focus){map.panTo([siteLocationLatLng.lat,siteLocationLatLng.lng]);}}
+function validateSiteLocationWithAlert(){refreshSiteLocationState();if(siteLocationRaw&&!siteLocationLatLng){alert('Site Location must be entered as latitude, longitude. Example: 43.882840, -79.440280');return false;}return true;}
+function getBatchGatewayShares(batch){const gatewayNames=parseGatewayNames(batch.gateway);if(gatewayNames.length===0)return[];const source=(batch&&batch.gatewayShares&&typeof batch.gatewayShares==='object')?batch.gatewayShares:{};const values=gatewayNames.map(name=>Number(source[name]));const allFinite=values.every(v=>Number.isFinite(v)&&v>=0);const total=allFinite?values.reduce((s,v)=>s+v,0):0;if(!allFinite||total<=0){const equal=1/gatewayNames.length;return gatewayNames.map(name=>({name,share:equal}));}return gatewayNames.map((name,idx)=>({name,share:values[idx]/total}));}
+function openGroupShareModal(){renderGroupingShareEditor();document.getElementById('group-share-backdrop').style.display='flex';}
+function closeGroupShareModal(){document.getElementById('group-share-backdrop').style.display='none';}
+function renderGroupingShareEditor(){const container=document.getElementById('group-share-content');container.innerHTML='';if(selectionBatches.length===0){container.innerHTML='<div class="group-share-warning">No groups are currently loaded.</div>';return;}selectionBatches.forEach(batch=>{const block=document.createElement('div');block.className='group-share-block';const gateways=parseGatewayNames(batch.gateway);const shares=getBatchGatewayShares(batch);const zonesCount=batch.zones.length;let html=`<div class="group-share-title">Group ${batch.id}: ${batch.direction}</div><div class="group-share-subtitle">Gateways: ${batch.gateway} | Assigned zones: ${zonesCount}</div>`;if(gateways.length<=1){html+=`<div class="group-share-row"><div>${gateways[0]||batch.gateway}</div><input class="group-share-readonly" type="number" value="100" readonly></div>`;}else{shares.forEach(item=>{html+=`<div class="group-share-row"><div>${item.name}</div><input type="number" min="0" max="100" step="0.1" id="group-share-${batch.id}-${encodeURIComponent(item.name)}" value="${(item.share*100).toFixed(1)}"></div>`;});html+=`<div class="group-share-subtitle">Group total must equal 100.0%</div>`;}block.innerHTML=html;container.appendChild(block);});}
+function saveGroupingShareEdits(){for(const batch of selectionBatches){const gateways=parseGatewayNames(batch.gateway);if(gateways.length<=1){batch.gatewayShares={};if(gateways[0])batch.gatewayShares[gateways[0]]=1;continue;}let total=0;const newMap={};for(const name of gateways){const input=document.getElementById(`group-share-${batch.id}-${encodeURIComponent(name)}`);if(!input){alert(`Missing input for group ${batch.id} / ${name}.`);return;}const pct=Number(String(input.value).trim());if(!Number.isFinite(pct)||pct<0){alert(`Enter a valid percentage for group ${batch.id} / ${name}.`);return;}newMap[name]=pct/100;total+=pct;}if(Math.abs(total-100)>0.05){alert(`Percentages for group ${batch.id} must add up to 100. Current total: ${total.toFixed(1)}.`);return;}batch.gatewayShares=newMap;}closeGroupShareModal();if(gatewayTestingMode){refreshZoneTripMapIfNeeded(()=>{calculateGatewayStats();renderGatewayTestingLayers();updateGatewayStatsPopup();updateGatewayModeBar();});}else{calculateGatewayStats();updateGatewayStatsPopup();}updateLegend();}
+function synchronizeGatewayDefinitions(){
+  const validNames=new Set(getReferencedGatewayNames());
+  Object.keys(gatewayDefinitions).forEach(name=>{if(!validNames.has(name)) delete gatewayDefinitions[name];});
+  const modalSelect=document.getElementById('gateway-modal-select');
+  if(modalSelect && modalSelect.value && !validNames.has(modalSelect.value)){modalSelect.value='';}
+}
+function updateZoneLabels(){if(!geoJsonLayer)return;const show=document.getElementById('show-zone-labels').checked;geoJsonLayer.eachLayer(layer=>{const id=String(Object.values(layer.feature.properties)[0]).trim();if(show){layer.bindTooltip(id,{permanent:true,direction:'center',className:'zone-label',opacity:1}).openTooltip();}else{layer.unbindTooltip();}});} 
+window.setActiveBatch=function(batchId){activeBatchId=(activeBatchId===batchId)?null:batchId;refreshMapStyles();updateLegend();};
+window.startRename=function(batchId){renamingBatchId=batchId;updateLegend();};
+window.saveRename=function(batchId){const batch=selectionBatches.find(b=>b.id===batchId);if(!batch)return;const gatewayInput=document.getElementById(`rename-gateway-${batchId}`),directionInput=document.getElementById(`rename-direction-${batchId}`);if(!gatewayInput||!directionInput)return;const newGateway=gatewayInput.value.trim(),newDirection=directionInput.value.trim();if(!newDirection||!newGateway){alert('Direction and Gateway cannot be blank.');return;}const duplicate=selectionBatches.find(b=>b.id!==batchId&&b.direction===newDirection&&b.gateway===newGateway);if(duplicate){alert('Another group already has that exact Direction and Gateway. Rename cancelled to avoid duplicate groups.');return;}batch.direction=newDirection;batch.gateway=newGateway;batch.gatewayShares={};getBatchGatewayShares(batch).forEach(item=>batch.gatewayShares[item.name]=item.share);synchronizeGatewayDefinitions();renamingBatchId=null;updateLegend();if(gatewayTestingMode){updateGatewayModalSelect();updateGatewayModeBar();renderGatewayTestingLayers();}};
+function refreshMapStyles(){if(!geoJsonLayer)return;geoJsonLayer.eachLayer(layer=>{const props=layer.feature.properties;const id=String(Object.values(props)[0]).trim();const batch=getBatchForZone(id);if(batch){props._isStaged=true;if(batch.id===activeBatchId){layer.setStyle({color:'#00bcd4',weight:4,fillOpacity:.9,fillColor:'#80deea'});}else{layer.setStyle(styles.completed(batch.color));}}else{props._isStaged=false;layer.setStyle(props._isSelected?styles.selected:styles.default);}});} 
+function updateGoogleMapsModeBar(){const bar=document.getElementById('gmaps-mode-bar');const txt=document.getElementById('gmaps-mode-text');const randomToggle=document.getElementById('gmaps-mode-point-random');const clickToggle=document.getElementById('gmaps-mode-point-click');if(randomToggle)randomToggle.checked=googleMapsPointMode==='random';if(clickToggle)clickToggle.checked=googleMapsPointMode==='click';if(googleMapsMode){const roleText=googleMapsZoneRole==='origin'?'Origin':'Destination';txt.innerText=`Google Maps URL Integration mode active — selected zone is ${roleText}`;bar.style.display='flex';}else{bar.style.display='none';}}
+function updateGoogleMapsRoutingLocationPrompt(){const label=document.getElementById('gmaps-routing-location-label');const input=document.getElementById('gmaps-routing-location');if(!label||!input)return;if(googleMapsZoneRole==='origin'){label.innerText='Input coordinates of destination';input.placeholder='Latitude, longitude e.g. 43.882840, -79.440280';}else if(googleMapsZoneRole==='destination'){label.innerText='Input coordinates of origin';input.placeholder='Latitude, longitude e.g. 43.882840, -79.440280';}else{label.innerText='Coordinates for routing';input.placeholder='Latitude, longitude e.g. 43.882840, -79.440280';}}
+function setGoogleMapsRole(role){googleMapsZoneRole=(googleMapsZoneRole===role)?null:role;document.getElementById('gmaps-zone-origin').checked=googleMapsZoneRole==='origin';document.getElementById('gmaps-zone-destination').checked=googleMapsZoneRole==='destination';updateGoogleMapsRoutingLocationPrompt();}
+function setGoogleMapsPointMode(mode){if(mode==='click'){googleMapsPointMode=(googleMapsPointMode==='click')?'random':'click';}else{googleMapsPointMode='random';}const randomToggle=document.getElementById('gmaps-mode-point-random');const clickToggle=document.getElementById('gmaps-mode-point-click');if(randomToggle)randomToggle.checked=googleMapsPointMode==='random';if(clickToggle)clickToggle.checked=googleMapsPointMode==='click';}
+function openGoogleMapsModal(){refreshSiteLocationState();document.getElementById('gmaps-routing-location').value=siteLocationRaw||googleMapsRoutingLocation;document.getElementById('gmaps-zone-origin').checked=googleMapsZoneRole==='origin';document.getElementById('gmaps-zone-destination').checked=googleMapsZoneRole==='destination';document.getElementById('gmaps-avoid-tolls').checked=googleMapsAvoidOptions.includes('tolls');document.getElementById('gmaps-avoid-highways').checked=googleMapsAvoidOptions.includes('highways');document.getElementById('gmaps-avoid-ferries').checked=googleMapsAvoidOptions.includes('ferries');updateGoogleMapsRoutingLocationPrompt();document.getElementById('gmaps-modal-backdrop').style.display='flex';}
+function closeGoogleMapsModal(){document.getElementById('gmaps-modal-backdrop').style.display='none';}
+function exitGoogleMapsMode(){googleMapsMode=false;googleMapsZoneRole=null;updateGoogleMapsModeBar();}
+function enableGoogleMapsMode(){const loc=document.getElementById('gmaps-routing-location').value.trim();if(!loc){alert(googleMapsZoneRole==='origin'?'Enter the destination coordinates first.':googleMapsZoneRole==='destination'?'Enter the origin coordinates first.':'Enter coordinates for routing first.');return;}if(parseSiteLocation(loc)===null){alert('Location for routing must be entered as latitude, longitude. Example: 43.882840, -79.440280');return;}if(!googleMapsZoneRole){alert('Select either "Use selected zone as Origin" or "Use selected zone as Destination".');return;}refreshSiteLocationState();if(siteLocationRaw&&loc!==siteLocationRaw){alert('Caution: you are overriding the defined Site Location for this Google Maps routing setup.');}googleMapsRoutingLocation=loc;googleMapsAvoidOptions=[];if(document.getElementById('gmaps-avoid-tolls').checked)googleMapsAvoidOptions.push('tolls');if(document.getElementById('gmaps-avoid-highways').checked)googleMapsAvoidOptions.push('highways');if(document.getElementById('gmaps-avoid-ferries').checked)googleMapsAvoidOptions.push('ferries');exitGatewayTestingMode();googleMapsMode=true;closeGoogleMapsModal();updateGoogleMapsModeBar();}
+function flattenCoordinates(coords,out){if(typeof coords[0]==='number'){out.push(coords);}else{coords.forEach(c=>flattenCoordinates(c,out));}}
+function pointInRing(point,ring){const x=point[0],y=point[1];let inside=false;for(let i=0,j=ring.length-1;i<ring.length;j=i++){const xi=ring[i][0],yi=ring[i][1],xj=ring[j][0],yj=ring[j][1];const intersect=((yi>y)!==(yj>y))&&(x<(xj-xi)*(y-yi)/((yj-yi)||1e-12)+xi);if(intersect)inside=!inside;}return inside;}
+function pointInPolygonCoordinates(point,poly){if(!poly||poly.length===0)return false;if(!pointInRing(point,poly[0]))return false;for(let i=1;i<poly.length;i++){if(pointInRing(point,poly[i]))return false;}return true;}
+function pointInFeatureGeometry(point,geom){if(!geom)return false;if(geom.type==='Polygon')return pointInPolygonCoordinates(point,geom.coordinates);if(geom.type==='MultiPolygon')return geom.coordinates.some(poly=>pointInPolygonCoordinates(point,poly));return false;}
+function getRandomPointInFeature(feature){const geom=feature.geometry;let flat=[];flattenCoordinates(geom.coordinates,flat);const lngs=flat.map(c=>c[0]),lats=flat.map(c=>c[1]);const minLng=Math.min(...lngs),maxLng=Math.max(...lngs),minLat=Math.min(...lats),maxLat=Math.max(...lats);for(let i=0;i<5000;i++){const lng=minLng+Math.random()*(maxLng-minLng),lat=minLat+Math.random()*(maxLat-minLat);if(pointInFeatureGeometry([lng,lat],geom))return{lat,lng};}return{lat:(minLat+maxLat)/2,lng:(minLng+maxLng)/2};}
+function openGoogleMapsRouteForFeature(feature, clickLatLng){const p=(googleMapsPointMode==='click'&&clickLatLng)?{lat:clickLatLng.lat,lng:clickLatLng.lng}:getRandomPointInFeature(feature);const zoneCoord=`${p.lat.toFixed(6)},${p.lng.toFixed(6)}`;let origin,destination;if(googleMapsZoneRole==='origin'){origin=zoneCoord;destination=googleMapsRoutingLocation;}else{origin=googleMapsRoutingLocation;destination=zoneCoord;}let url=`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}&travelmode=driving`;if(googleMapsAvoidOptions.length>0){url+=`&avoid=${encodeURIComponent(googleMapsAvoidOptions.join(','))}`;}window.open(url,'_blank');}
+function ensureCsvFileLoaded(){const csvInput=document.getElementById('csv-filter-input');const csvFile=csvInput.files[0];if(csvFile&&!validateFileExtension(csvInput,['.csv'],'Filter CSV'))return null;return csvFile||null;}
+function clearGatewayDraft(updateMap=true){if(gatewayDefinitionDraft.tempLayer){gatewaySegmentLayerGroup.removeLayer(gatewayDefinitionDraft.tempLayer);}gatewayDefinitionDraft={gatewayName:'',point:null,tempLayer:null};gatewayCaptureActive=false;updateGatewayModeBar();if(updateMap)renderGatewayTestingLayers();}
+function closeGatewayModal(){document.getElementById('gateway-modal-backdrop').style.display='none';}
+function openGatewayModal(selectedGateway=''){
+  if(!gatewayTestingMode) return;
+  updateGatewayModalSelect(selectedGateway);
+  updateGatewayModalStatus();
+  document.getElementById('gateway-modal-backdrop').style.display='flex';
+}
+function updateGatewayModalSelect(preferred=''){
+  synchronizeGatewayDefinitions();
+  const select=document.getElementById('gateway-modal-select');
+  const gateways=getReferencedGatewayNames();
+  const current=preferred || select.value;
+  select.innerHTML='';
+  if(gateways.length===0){const opt=document.createElement('option');opt.value='';opt.textContent='No gateways available';select.appendChild(opt);select.disabled=true;return;}
+  select.disabled=false;
+  gateways.forEach(name=>{
+    const defined=!!(gatewayDefinitions[name]&&gatewayDefinitions[name].point);
+    const opt=document.createElement('option');
+    opt.value=name;
+    opt.textContent=`${defined ? '✓' : '○'} ${name}`;
+    select.appendChild(opt);
+  });
+  select.value = gateways.includes(current) ? current : (getUndefinedGatewayNames()[0] || gateways[0]);
+}
+function updateGatewayModalStatus(){
+  const select=document.getElementById('gateway-modal-select');
+  const status=document.getElementById('gateway-selected-status');
+  const completion=document.getElementById('gateway-completion-status');
+  const name=select.value;
+  const def=name ? gatewayDefinitions[name] : null;
+  if(!name || name==='No gateways available'){
+    status.innerHTML='No gateway selected.';
+  } else if(def && def.point){
+    status.innerHTML=`<strong>${name}</strong> is currently <strong>defined</strong>. Double-click its point on the map to reopen this popup for editing, or click <strong>Define / Redefine on Map</strong> to overwrite the current definition.`;
+  } else {
+    status.innerHTML=`<strong>${name}</strong> is currently <strong>undefined</strong>. Click <strong>Define / Redefine on Map</strong> to capture it with one click on the map.`;
+  }
+  const gateways=getReferencedGatewayNames();
+  const missing=getUndefinedGatewayNames();
+  if(gateways.length===0){
+    completion.innerHTML='No gateway groups are currently loaded.';
+  } else if(missing.length===0){
+    completion.innerHTML=`All <strong>${gateways.length}</strong> referenced gateways are currently defined. Click <strong>Finished Defining Gateways</strong> when you want to display the visualization.`;
+  } else {
+    completion.innerHTML=`Currently defined: <strong>${gateways.length - missing.length}</strong> of <strong>${gateways.length}</strong>. Remaining undefined gateways: <strong>${missing.join(', ')}</strong>.`;
+  }
+}
+function calculateGatewayStats(){
+  const statsMap=new Map();
+  const tripMap=zoneTripMapCache||new Map();
+  selectionBatches.forEach(batch=>{
+    const shares=getBatchGatewayShares(batch).filter(item=>item.share>0 && gatewayDefinitions[item.name]&&gatewayDefinitions[item.name].point);
+    if(shares.length===0) return;
+    batch.zones.forEach(zoneId=>{
+      const tripVal=Math.max(0, parseTripValue(tripMap.get(zoneId)));
+      shares.forEach(item=>{
+        if(!statsMap.has(item.name)) statsMap.set(item.name,{gateway:item.name,totalTrips:0,zoneIds:new Set()});
+        const rec=statsMap.get(item.name);
+        rec.totalTrips += tripVal*item.share;
+        rec.zoneIds.add(zoneId);
+      });
+    });
+  });
+  gatewayStatsData = Array.from(statsMap.values()).map(rec=>({gateway:rec.gateway,assignedZones:rec.zoneIds.size,totalTrips:rec.totalTrips})).sort((a,b)=>String(a.gateway).localeCompare(String(b.gateway)));
+}
+function updateGatewayStatsPopup(){
+  const empty=document.getElementById('gateway-stats-empty');
+  const table=document.getElementById('gateway-stats-table');
+  const tbody=document.getElementById('gateway-stats-tbody');
+  tbody.innerHTML='';
+  if(gatewayStatsData.length===0){
+    empty.style.display='block';
+    table.style.display='none';
+    empty.innerText='Gateway statistics will appear here when gateway totals can be calculated.';
+    return;
+  }
+  empty.style.display='none';
+  table.style.display='table';
+  gatewayStatsData.forEach(row=>{
+    const tr=document.createElement('tr');
+    const tdGateway=document.createElement('td'); tdGateway.textContent=row.gateway;
+    const tdZones=document.createElement('td'); tdZones.textContent=String(row.assignedZones);
+    const tdTrips=document.createElement('td'); tdTrips.textContent=Number.isFinite(row.totalTrips)?row.totalTrips.toLocaleString(undefined,{maximumFractionDigits:2}):'0';
+    tr.appendChild(tdGateway); tr.appendChild(tdZones); tr.appendChild(tdTrips);
+    tbody.appendChild(tr);
+  });
+}
+function openGatewayStatsModal(){
+  if(getTripColIdx(true)===null) return;
+  refreshZoneTripMapIfNeeded(()=>{
+    calculateGatewayStats();
+    updateGatewayStatsPopup();
+    document.getElementById('gateway-stats-backdrop').style.display='flex';
+  });
+}
+function closeGatewayStatsModal(){document.getElementById('gateway-stats-backdrop').style.display='none';}
+function updateGatewayModeBar(){
+  const bar=document.getElementById('gateway-mode-bar');
+  const txt=document.getElementById('gateway-mode-text');
+  const showBtn=document.getElementById('gateway-show-vis-btn');
+  const statsBtn=document.getElementById('gateway-stats-btn');
+  const cancelBtn=document.getElementById('gateway-cancel-define-btn');
+  const labelsToggle=document.getElementById('gateway-show-labels-toggle');
+  if(!gatewayTestingMode){bar.style.display='none';return;}
+  synchronizeGatewayDefinitions();
+  labelsToggle.checked=gatewayShowLabels;
+  if(gatewayCaptureActive && gatewayDefinitionDraft.gatewayName){
+    txt.innerText=`Gateway Testing Mode active — defining ${gatewayDefinitionDraft.gatewayName}`;
+    cancelBtn.style.display='inline-block';
+  } else if(gatewayVisualizationActive){
+    txt.innerText='Gateway Testing Mode active — visualization shown';
+    cancelBtn.style.display='none';
+  } else {
+    txt.innerText='Gateway Testing Mode active';
+    cancelBtn.style.display='none';
+  }
+  const allDefined=getReferencedGatewayNames().length>0 && getUndefinedGatewayNames().length===0;
+  showBtn.disabled=!allDefined;
+  statsBtn.disabled=getReferencedGatewayNames().length===0;
+  bar.style.display='flex';
+}
+function loadZoneTripMap(callback){
+  const csvFile=ensureCsvFileLoaded();
+  if(!csvFile){alert('Upload the Filter CSV first.');return;}
+  const zoneColIdx=getZoneColIdx();
+  const tripColIdx=getTripColIdx(true);
+  const startRow=parseInt(document.getElementById('start-row').value);
+  if(zoneColIdx===null||tripColIdx===null)return;
+  Papa.parse(csvFile,{header:false,skipEmptyLines:false,complete:results=>{
+    const tripMap=new Map();
+    for(let i=startRow-1;i<results.data.length;i++){
+      const row=results.data[i];
+      if(!row||row.length===0)continue;
+      const zoneId=String(row[zoneColIdx]??'').trim();
+      if(!zoneId)continue;
+      tripMap.set(zoneId,row[tripColIdx]);
+    }
+    zoneTripMapCache=tripMap;
+    if(typeof callback==='function')callback(tripMap);
+  }});
+}
+function refreshZoneTripMapIfNeeded(callback){
+  if(zoneTripMapCache){ if(typeof callback==='function') callback(zoneTripMapCache); return; }
+  loadZoneTripMap(callback);
+}
+function renderGatewayTestingLayers(){
+  gatewaySegmentLayerGroup.clearLayers();
+  gatewayFlowLayerGroup.clearLayers();
+  gatewaySiteFlowLayerGroup.clearLayers();
+  gatewayStatsData=[];
+  if(!gatewayTestingMode)return;
+  refreshSiteLocationState();
+  const gatewayNames=getReferencedGatewayNames();
+  let gatewayTotals=new Map();
+  let lineRecords=[];
+  if(gatewayVisualizationActive){
+    const tripMap=zoneTripMapCache||new Map();
+    selectionBatches.forEach(batch=>{
+      const shares=getBatchGatewayShares(batch).filter(item=>item.share>0 && gatewayDefinitions[item.name]&&gatewayDefinitions[item.name].point);
+      if(shares.length===0)return;
+      batch.zones.forEach(zoneId=>{
+        const zoneLayer=zoneLayerById.get(zoneId);
+        if(!zoneLayer)return;
+        const center=zoneLayer.getBounds().getCenter();
+        const tripVal=Math.max(0, parseTripValue(tripMap.get(zoneId)));
+        shares.forEach(item=>{
+          const gatewayTrip=tripVal*item.share;
+          lineRecords.push({batchColor:batch.color,center,gatewayPoint:gatewayDefinitions[item.name].point,tripShare:gatewayTrip});
+          gatewayTotals.set(item.name,(gatewayTotals.get(item.name)||0)+gatewayTrip);
+        });
+      });
+    });
+    const maxShare=Math.max(0,...lineRecords.map(r=>r.tripShare));
+    lineRecords.forEach(record=>{
+      const weight=maxShare>0?(1 + (record.tripShare/maxShare)*7):1.5;
+      L.polyline([record.center,record.gatewayPoint],{color:'#000000',weight:weight+2.2,opacity:.55,lineCap:'round'}).addTo(gatewayFlowLayerGroup);
+      L.polyline([record.center,record.gatewayPoint],{color:record.batchColor,weight,opacity:.8,lineCap:'round'}).addTo(gatewayFlowLayerGroup);
+    });
+  } else {
+    calculateGatewayStats();
+  }
+  const maxGatewayTotal=Math.max(0,...Array.from(gatewayTotals.values()));
+  gatewayNames.forEach(name=>{
+    const def=gatewayDefinitions[name];
+    if(!(def&&def.point))return;
+    const total=gatewayTotals.get(name)||0;
+    const radius=gatewayVisualizationActive ? (maxGatewayTotal>0?(6 + (total/maxGatewayTotal)*14):7) : 7;
+    const marker=L.circleMarker(def.point,{color:'#2c3e50',weight:2,fillColor:'#ffffff',fillOpacity:.95,radius}).addTo(gatewaySegmentLayerGroup);
+    if(gatewayShowLabels){marker.bindTooltip(name,{permanent:true,direction:'top',className:'gateway-segment-label',opacity:1});}
+    marker.on('dblclick',e=>{L.DomEvent.stopPropagation(e);gatewayVisualizationActive=false;clearGatewayDraft(false);openGatewayModal(name);renderGatewayTestingLayers();updateGatewayModeBar();});
+    if(gatewayVisualizationActive){
+      const zoneSet=new Set();
+      selectionBatches.forEach(batch=>{getBatchGatewayShares(batch).filter(item=>item.share>0 && item.name===name).forEach(()=>batch.zones.forEach(z=>zoneSet.add(z)));});
+      gatewayStatsData.push({gateway:name,assignedZones:zoneSet.size,totalTrips:total});
+      if(siteLocationLatLng && shouldShowSiteLocation()){
+        const siteWeight=maxGatewayTotal>0?(1 + (total/maxGatewayTotal)*10):2;
+        L.polyline([def.point,[siteLocationLatLng.lat,siteLocationLatLng.lng]],{color:'#2c3e50',weight:siteWeight,opacity:.75,lineCap:'round'}).addTo(gatewaySiteFlowLayerGroup);
+      }
+    }
+  });
+  if(gatewayVisualizationActive){gatewayStatsData.sort((a,b)=>String(a.gateway).localeCompare(String(b.gateway)));}
+  updateGatewayStatsPopup();
+}
+function showGatewayDefinitionWarning(){
+  const missing=getUndefinedGatewayNames();
+  if(missing.length===0) return false;
+  alert('Gateway Testing Mode cannot continue to visualization until all referenced gateways are defined. The following gateways are still undefined:\n\n• ' + missing.join('\n• '));
+  return true;
+}
+function startGatewayCapture(){
+  const select=document.getElementById('gateway-modal-select');
+  const gatewayName=select.value;
+  if(!gatewayName || gatewayName==='No gateways available'){alert('Select a gateway first.');return;}
+  gatewayVisualizationActive=false;
+  closeGatewayModal();
+  clearGatewayDraft(false);
+  gatewayCaptureActive=true;
+  gatewayDefinitionDraft.gatewayName=gatewayName;
+  updateGatewayModeBar();
+  renderGatewayTestingLayers();
+}
+function finishGatewayDefinitions(){
+  if(showGatewayDefinitionWarning()){
+    updateGatewayModalStatus();
+    return;
+  }
+  gatewayVisualizationActive=true;
+  clearGatewayDraft(false);
+  refreshZoneTripMapIfNeeded(()=>{renderGatewayTestingLayers();updateGatewayModeBar();closeGatewayModal();});
+}
+function clearSelectedGatewayDefinition(){
+  const select=document.getElementById('gateway-modal-select');
+  const name=select.value;
+  if(!name || name==='No gateways available'){alert('Select a gateway first.');return;}
+  delete gatewayDefinitions[name];
+  if(gatewayDefinitionDraft.gatewayName===name) clearGatewayDraft(false);
+  gatewayVisualizationActive=false;
+  updateGatewayModalSelect(name);
+  updateGatewayModalStatus();
+  updateGatewayModeBar();
+  renderGatewayTestingLayers();
+}
+function activateGatewayTestingMode(){
+  if(selectionBatches.length===0){alert('Create or load at least one Direction + Gateway group before using Gateway Testing Mode.');return;}
+  const csvFile=ensureCsvFileLoaded();
+  if(!csvFile){alert('Upload the Filter CSV first.');return;}
+  if(getTripColIdx(true)===null)return;
+  synchronizeGatewayDefinitions();
+  exitGoogleMapsMode();
+  gatewayTestingMode=true;
+  gatewayVisualizationActive=false;
+  clearGatewayDraft(false);
+  map.doubleClickZoom.disable();
+  updateGatewayModeBar();
+  renderGatewayTestingLayers();
+  openGatewayModal();
+}
+function exitGatewayTestingMode(){
+  gatewayTestingMode=false;
+  gatewayVisualizationActive=false;
+  closeGatewayModal();
+  closeGatewayStatsModal();
+  closeGroupShareModal();
+  clearGatewayDraft(false);
+  gatewaySegmentLayerGroup.clearLayers();
+  gatewayFlowLayerGroup.clearLayers();
+  gatewaySiteFlowLayerGroup.clearLayers();
+  gatewayStatsData=[];
+  updateGatewayModeBar();
+  map.doubleClickZoom.enable();
+}
+function handleGatewayModeMapClick(latlng){
+  if(!gatewayTestingMode || !gatewayCaptureActive) return;
+  const gatewayName=gatewayDefinitionDraft.gatewayName;
+  if(!gatewayName)return;
+  gatewayDefinitions[gatewayName]={point:latlng};
+  gatewayCaptureActive=false;
+  gatewayDefinitionDraft={gatewayName:'',point:null,tempLayer:null};
+  updateGatewayModalSelect(gatewayName);
+  updateGatewayModalStatus();
+  updateGatewayModeBar();
+  renderGatewayTestingLayers();
+  openGatewayModal(gatewayName);
+}
+map.on('mousemove',e=>{if(!gatewayTestingMode || !gatewayCaptureActive || !gatewayDefinitionDraft.tempLayer)return;});
+map.on('click',e=>{if(gatewayTestingMode){handleGatewayModeMapClick(e.latlng);}});
+function updateLegend(){const content=document.getElementById('legend-content');content.innerHTML='';selectionBatches.forEach(batch=>{const item=document.createElement('div');item.className='legend-item';const isActive=batch.id===activeBatchId,isRenaming=batch.id===renamingBatchId;if(isRenaming){item.innerHTML=`<div class="legend-gw"><div class="legend-gw-left"><div class="legend-select-stack"><div class="legend-swatch" style="background:${batch.color}"></div><input class="legend-edit-checkbox" type="checkbox" ${isActive?'checked':''} onclick="event.stopPropagation(); setActiveBatch(${batch.id});" title="Select this group for map editing"></div><span><strong>Gateway:</strong></span></div><button class="remove-btn" onclick="event.stopPropagation(); removeSelection(${batch.id})" title="Remove Selection">✖</button></div><div class="legend-details"><input class="legend-edit-input" id="rename-gateway-${batch.id}" value="${batch.gateway}" onclick="event.stopPropagation();"><strong>Direction:</strong><input class="legend-edit-input" id="rename-direction-${batch.id}" value="${batch.direction}" onclick="event.stopPropagation();"><button class="legend-action-btn" onclick="event.stopPropagation(); saveRename(${batch.id});">Save</button></div>`;}else{item.innerHTML=`<div class="legend-gw"><div class="legend-gw-left"><div class="legend-select-stack"><div class="legend-swatch" style="background:${batch.color}"></div><input class="legend-edit-checkbox" type="checkbox" ${isActive?'checked':''} onclick="event.stopPropagation(); setActiveBatch(${batch.id});" title="Select this group for map editing"></div><span><strong>Gateway:</strong> ${batch.gateway}</span></div><button class="remove-btn" onclick="event.stopPropagation(); removeSelection(${batch.id})" title="Remove Selection">✖</button></div><div class="legend-details"><strong>Direction:</strong> ${batch.direction}${isActive?'<br><em>Editing this group</em>':''}<br><button class="legend-action-btn" onclick="event.stopPropagation(); startRename(${batch.id});">Rename</button></div>`;}content.appendChild(item);});if(gatewayTestingMode){synchronizeGatewayDefinitions();updateGatewayModalSelect();updateGatewayModalStatus();updateGatewayModeBar();renderGatewayTestingLayers();}}
+window.removeSelection=function(batchId){const idx=selectionBatches.findIndex(b=>b.id===batchId);if(idx===-1)return;const batch=selectionBatches[idx];const ids=new Set(batch.zones);totalSelectionCount-=batch.zones.length;selectionBatches.splice(idx,1);if(activeBatchId===batchId)activeBatchId=null;if(renamingBatchId===batchId)renamingBatchId=null;if(geoJsonLayer){geoJsonLayer.eachLayer(layer=>{const id=String(Object.values(layer.feature.properties)[0]).trim();if(ids.has(id)){layer.feature.properties._isStaged=false;layer.feature.properties._isSelected=false;}});}synchronizeGatewayDefinitions();refreshMapStyles();updateSelectedCounter();updateLegend();};
+document.getElementById('geojson-input').addEventListener('change',e=>{if(!validateFileExtension(e.target,['.geojson'],'Zone definition polygon'))return;const reader=new FileReader();reader.onload=ev=>{masterData=JSON.parse(ev.target.result);renderMap(masterData);document.getElementById('total-count').innerText=masterData.features.length;};reader.readAsText(e.target.files[0]);});
+document.getElementById('csv-filter-input').addEventListener('change',e=>{validateFileExtension(e.target,['.csv'],'Filter CSV');zoneTripMapCache=null;if(gatewayTestingMode && gatewayVisualizationActive){loadZoneTripMap(()=>renderGatewayTestingLayers());}});
+document.getElementById('show-zone-labels').addEventListener('change',updateZoneLabels);
+document.getElementById('site-location-input').addEventListener('change',()=>{if(validateSiteLocationWithAlert()){updateSiteLocationMarker(false);if(gatewayTestingMode)renderGatewayTestingLayers();}});
+document.getElementById('show-site-location').addEventListener('change',()=>{if(validateSiteLocationWithAlert()){updateSiteLocationMarker(true);if(gatewayTestingMode)renderGatewayTestingLayers();}else{document.getElementById('show-site-location').checked=false;clearSiteLocationMarker();gatewaySiteFlowLayerGroup.clearLayers();}});
+document.getElementById('gmaps-config-btn').addEventListener('click',openGoogleMapsModal);
+document.getElementById('gateway-testing-btn').addEventListener('click',activateGatewayTestingMode);
+document.getElementById('gateway-manage-btn').addEventListener('click',()=>openGatewayModal());
+document.getElementById('gateway-show-vis-btn').addEventListener('click',()=>{if(getUndefinedGatewayNames().length>0){openGatewayModal();showGatewayDefinitionWarning();return;}gatewayVisualizationActive=true;refreshZoneTripMapIfNeeded(()=>{renderGatewayTestingLayers();updateGatewayModeBar();});});
+document.getElementById('gateway-stats-btn').addEventListener('click',openGatewayStatsModal);
+document.getElementById('group-share-btn').addEventListener('click',openGroupShareModal);
+document.getElementById('gateway-show-labels-toggle').addEventListener('change',e=>{gatewayShowLabels=e.target.checked;if(gatewayTestingMode)renderGatewayTestingLayers();});
+document.getElementById('gateway-cancel-define-btn').addEventListener('click',()=>clearGatewayDraft(true));
+document.getElementById('gateway-exit-btn').addEventListener('click',exitGatewayTestingMode);
+document.getElementById('gateway-modal-close').addEventListener('click',closeGatewayModal);
+document.getElementById('gateway-modal-ok-btn').addEventListener('click',closeGatewayModal);
+document.getElementById('gateway-modal-exit-btn').addEventListener('click',exitGatewayTestingMode);
+document.getElementById('gateway-define-btn').addEventListener('click',startGatewayCapture);
+document.getElementById('gateway-clear-definition-btn').addEventListener('click',clearSelectedGatewayDefinition);
+document.getElementById('gateway-finished-btn').addEventListener('click',finishGatewayDefinitions);
+document.getElementById('gateway-modal-select').addEventListener('change',updateGatewayModalStatus);
+document.getElementById('gateway-modal-backdrop').addEventListener('click',e=>{if(e.target.id==='gateway-modal-backdrop')closeGatewayModal();});
+document.getElementById('gateway-stats-close').addEventListener('click',closeGatewayStatsModal);
+document.getElementById('gateway-stats-ok-btn').addEventListener('click',closeGatewayStatsModal);
+document.getElementById('gateway-stats-backdrop').addEventListener('click',e=>{if(e.target.id==='gateway-stats-backdrop')closeGatewayStatsModal();});
+document.getElementById('group-share-close').addEventListener('click',closeGroupShareModal);
+document.getElementById('group-share-cancel-btn').addEventListener('click',closeGroupShareModal);
+document.getElementById('group-share-save-btn').addEventListener('click',saveGroupingShareEdits);
+document.getElementById('group-share-backdrop').addEventListener('click',e=>{if(e.target.id==='group-share-backdrop')closeGroupShareModal();});
+document.getElementById('help-btn').addEventListener('click',()=>{document.getElementById('help-modal-backdrop').style.display='flex';});
+document.getElementById('help-modal-close').addEventListener('click',()=>{document.getElementById('help-modal-backdrop').style.display='none';});
+document.getElementById('help-modal-backdrop').addEventListener('click',e=>{if(e.target.id==='help-modal-backdrop')document.getElementById('help-modal-backdrop').style.display='none';});
+document.getElementById('gmaps-modal-close').addEventListener('click',closeGoogleMapsModal);
+document.getElementById('gmaps-cancel-btn').addEventListener('click',closeGoogleMapsModal);
+document.getElementById('gmaps-zone-origin').addEventListener('change',()=>setGoogleMapsRole('origin'));
+document.getElementById('gmaps-zone-destination').addEventListener('change',()=>setGoogleMapsRole('destination'));
+document.getElementById('gmaps-enable-btn').addEventListener('click',enableGoogleMapsMode);
+document.getElementById('gmaps-exit-btn').addEventListener('click',exitGoogleMapsMode);
+document.getElementById('gmaps-mode-point-random').addEventListener('change',()=>setGoogleMapsPointMode('random'));
+document.getElementById('gmaps-mode-point-click').addEventListener('change',()=>setGoogleMapsPointMode('click'));
+document.getElementById('filter-btn').addEventListener('click',()=>{const csvInput=document.getElementById('csv-filter-input');const csvFile=csvInput.files[0];if(csvFile&&!validateFileExtension(csvInput,['.csv'],'Filter CSV'))return;const startRow=parseInt(document.getElementById('start-row').value);const zoneColIdx=getZoneColIdx();if(!masterData||!csvFile)return alert('Upload files first.');if(zoneColIdx===null)return;Papa.parse(csvFile,{header:false,skipEmptyLines:true,complete:results=>{const rows=results.data.slice(startRow-1);const validIds=new Set(rows.map(row=>String(row[zoneColIdx]??'').trim()));const filtered=masterData.features.filter(f=>Object.values(f.properties).some(v=>validIds.has(String(v).trim())));renderMap({...masterData,features:filtered});document.getElementById('total-count').innerText=filtered.length;activeBatchId=null;totalSelectionCount=selectionBatches.reduce((sum,b)=>sum+b.zones.length,0);refreshMapStyles();updateSelectedCounter();updateLegend();}});});
+document.getElementById('load-assignments-btn').addEventListener('click',()=>{const csvInput=document.getElementById('csv-filter-input');const csvFile=csvInput.files[0];if(csvFile&&!validateFileExtension(csvInput,['.csv'],'Filter CSV'))return;const startRow=parseInt(document.getElementById('start-row').value);const zoneColIdx=getZoneColIdx();const cols=getDirectionGatewayColumns();if(!masterData||!geoJsonLayer||!csvFile)return alert('Upload GeoJSON and CSV first.');if(zoneColIdx===null||!cols)return;assignmentsLoadedFromCsv=true;loadedDirectionColIdx=cols.directionIdx;loadedGatewayColIdx=cols.gatewayIdx;Papa.parse(csvFile,{header:false,skipEmptyLines:false,complete:results=>{const groupMap=new Map();for(let i=startRow-1;i<results.data.length;i++){const row=results.data[i];if(!row||row.length===0)continue;const zoneId=String(row[zoneColIdx]??'').trim();const direction=String(row[cols.directionIdx]??'').trim();const gateway=String(row[cols.gatewayIdx]??'').trim();if(!zoneId||!direction||!gateway)continue;const key=direction+'||'+gateway;if(!groupMap.has(key))groupMap.set(key,{gateway,direction,zones:[]});groupMap.get(key).zones.push(zoneId);}selectionBatches=[];batchCounter=1;colorIndex=0;activeBatchId=null;renamingBatchId=null;groupMap.forEach(group=>{const batch={id:batchCounter++,gateway:group.gateway,direction:group.direction,color:presetColors[colorIndex%presetColors.length],zones:[...new Set(group.zones)],gatewayShares:{}};getBatchGatewayShares(batch).forEach(item=>batch.gatewayShares[item.name]=item.share);selectionBatches.push(batch);colorIndex++;});totalSelectionCount=selectionBatches.reduce((sum,b)=>sum+b.zones.length,0);if(geoJsonLayer)geoJsonLayer.eachLayer(layer=>{layer.feature.properties._isSelected=false;layer.feature.properties._isStaged=false;});synchronizeGatewayDefinitions();refreshMapStyles();updateSelectedCounter();updateLegend();zoneTripMapCache=null;if(gatewayTestingMode && gatewayVisualizationActive){loadZoneTripMap(()=>renderGatewayTestingLayers());}alert(`Loaded ${selectionBatches.length} groups from CSV.`);}});});
+function renderMap(data){zoneLayerById=new Map();if(geoJsonLayer)map.removeLayer(geoJsonLayer);geoJsonLayer=L.geoJSON(data,{style:styles.default,onEachFeature:(feature,layer)=>{feature.properties._isSelected=false;feature.properties._isStaged=false;const zoneId=String(Object.values(feature.properties)[0]).trim();zoneLayerById.set(zoneId,layer);layer.on('click',(e)=>{if(googleMapsMode){openGoogleMapsRouteForFeature(feature,e.latlng);return;}if(gatewayTestingMode){return;}const id=zoneId;const zoneBatch=getBatchForZone(id);if(activeBatchId!==null){const activeBatch=selectionBatches.find(b=>b.id===activeBatchId);if(!activeBatch)return;if(zoneBatch&&zoneBatch.id===activeBatchId){activeBatch.zones=activeBatch.zones.filter(z=>z!==id);feature.properties._isStaged=false;feature.properties._isSelected=false;totalSelectionCount-=1;}else if(!zoneBatch){activeBatch.zones.push(id);feature.properties._isStaged=true;feature.properties._isSelected=false;totalSelectionCount+=1;}else{return;}updateSelectedCounter();refreshMapStyles();updateLegend();return;}if(feature.properties._isStaged)return;feature.properties._isSelected=!feature.properties._isSelected;totalSelectionCount+=feature.properties._isSelected?1:-1;layer.setStyle(feature.properties._isSelected?styles.selected:styles.default);updateSelectedCounter();});}}).addTo(map);refreshMapStyles();updateZoneLabels();map.fitBounds(geoJsonLayer.getBounds());updateSiteLocationMarker(false);if(gatewayTestingMode)renderGatewayTestingLayers();}
+document.getElementById('apply-btn').addEventListener('click',()=>{const Direction=document.getElementById('Direction-input').value.trim();const Gateway=document.getElementById('Gateway-input').value.trim();if(!Direction||!Gateway)return alert('Enter Direction and Gateway.');let appliedZones=[],appliedLayers=[];geoJsonLayer.eachLayer(layer=>{const props=layer.feature.properties;if(props._isSelected&&!props._isStaged){const id=String(Object.values(props)[0]).trim();appliedZones.push(id);appliedLayers.push(layer);}});if(appliedZones.length===0){alert('Select new zones first.');return;}let existing=selectionBatches.find(b=>b.direction===Direction&&b.gateway===Gateway);if(existing){appliedZones.forEach(id=>{if(!existing.zones.includes(id))existing.zones.push(id);});appliedLayers.forEach(layer=>{layer.feature.properties._isStaged=true;layer.feature.properties._isSelected=false;layer.setStyle(styles.completed(existing.color));});}else{const color=presetColors[colorIndex%presetColors.length];appliedLayers.forEach(layer=>{layer.feature.properties._isStaged=true;layer.feature.properties._isSelected=false;layer.setStyle(styles.completed(color));});selectionBatches.push({id:batchCounter++,gateway:Gateway,direction:Direction,color,zones:appliedZones});colorIndex++;}activeBatchId=null;synchronizeGatewayDefinitions();refreshMapStyles();updateSelectedCounter();updateLegend();zoneTripMapCache=null;if(gatewayTestingMode && gatewayVisualizationActive){loadZoneTripMap(()=>renderGatewayTestingLayers());}});
+function buildGatewayShareColumns(rows,startRow,zoneColIdx,exportDirectionIdx,uniqueGateways){const dataMap=new Map();selectionBatches.forEach(batch=>{const shares=getBatchGatewayShares(batch);batch.zones.forEach(zoneId=>{const rowObj={Direction:batch.direction,shares:{}};shares.forEach(item=>{rowObj.shares[item.name]=item.share;});dataMap.set(zoneId,rowObj);});});const headerRowIdx=startRow-2;if(headerRowIdx>=0){if(!rows[headerRowIdx])rows[headerRowIdx]=[];rows[headerRowIdx][exportDirectionIdx]='Direction';uniqueGateways.forEach((gw,i)=>{rows[headerRowIdx][exportDirectionIdx+1+i]=gw;});}for(let i=startRow-1;i<rows.length;i++){if(!rows[i])rows[i]=[];rows[i][exportDirectionIdx]='';uniqueGateways.forEach((gw,idx)=>{rows[i][exportDirectionIdx+1+idx]='';});}for(let i=startRow-1;i<rows.length;i++){const rowId=String(rows[i][zoneColIdx]??'').trim();if(!dataMap.has(rowId))continue;const match=dataMap.get(rowId);rows[i][exportDirectionIdx]=match.Direction;uniqueGateways.forEach((gw,idx)=>{rows[i][exportDirectionIdx+1+idx]=match.shares[gw]??'';});}}
+document.getElementById('export-btn').addEventListener('click',()=>{const csvInput=document.getElementById('csv-filter-input');const csvFile=csvInput.files[0];if(csvFile&&!validateFileExtension(csvInput,['.csv'],'Filter CSV'))return;if(!csvFile||selectionBatches.length===0)return alert('Missing input CSV or selections.');const startRow=parseInt(document.getElementById('start-row').value);const zoneColIdx=getZoneColIdx();if(zoneColIdx===null)return;const exportByGateways=document.getElementById('export-by-gateways').checked;const overwriteLoadedCols=document.getElementById('overwrite-loaded-cols').checked;let colIdx=colToIdx(document.getElementById('target-col').value);if(exportByGateways){if(overwriteLoadedCols){alert('Overwrite Loaded Columns is only available for the standard export. For TRIP DISTRIBUTION BY GATEWAYS, please use Output Column (Direction) and leave Overwrite Loaded Columns unchecked.');return;}if(colIdx<0)return alert('Output Column (Direction) must be a valid Excel-style column letter, such as D.');const uniqueGateways=getReferencedGatewayNames();if(uniqueGateways.length===0){alert('No gateways were found in the current groups.');return;}const proceed=window.confirm('Trip Distribution by Gateways export is an analyst-support approximation intended to help with testing and review. Gateway shares should be independently verified before they are used in final analysis or reporting.\n\nClick OK to continue with export, or Cancel to review the assignments first.');if(!proceed)return;Papa.parse(csvFile,{header:false,skipEmptyLines:false,complete:results=>{let outputRows=results.data;const headerRowIdx=startRow-2;const checkStartIdx=headerRowIdx>=0?headerRowIdx:0;for(let i=checkStartIdx;i<outputRows.length;i++){const row=outputRows[i];if(cellHasData(row,colIdx)){alert(`The selected output column (${document.getElementById('target-col').value.toUpperCase()}) already contains data. Please select a different Output Column (Direction).`);return;}for(let g=0;g<uniqueGateways.length;g++){if(cellHasData(row,colIdx+1+g)){alert('One or more required gateway output columns already contain data. Please select a different Output Column (Direction).');return;}}}buildGatewayShareColumns(outputRows,startRow,zoneColIdx,colIdx,uniqueGateways);const csv=Papa.unparse(outputRows);const blob=new Blob([csv],{type:'text/csv'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`${document.getElementById('filename-input').value||'distribution_results'}.csv`;a.click();}});return;}let exportDirectionIdx=colIdx,exportGatewayIdx=colIdx+1,usingLoadedColumns=false;if(overwriteLoadedCols){if(!assignmentsLoadedFromCsv||loadedDirectionColIdx===null||loadedGatewayColIdx===null){alert('Overwrite Loaded Columns can only be used after you enter Direction/Gateway columns and click Load Assignments.');return;}exportDirectionIdx=loadedDirectionColIdx;exportGatewayIdx=loadedGatewayColIdx;usingLoadedColumns=true;}else{if(colIdx<0)return alert('Output Column (Direction) must be a valid Excel-style column letter, such as D.');}Papa.parse(csvFile,{header:false,skipEmptyLines:false,complete:results=>{let outputRows=results.data;const headerRowIdx=startRow-2;const checkStartIdx=headerRowIdx>=0?headerRowIdx:0;if(!usingLoadedColumns){for(let i=checkStartIdx;i<outputRows.length;i++){const row=outputRows[i];if(cellHasData(row,exportDirectionIdx)||cellHasData(row,exportGatewayIdx)){alert(`The selected output columns (${document.getElementById('target-col').value.toUpperCase()} and the next column) already contain data. Either select other Output Columns, or overwrite the existing data by selecting "Overwrite Loaded Columns".`);return;}}}if(headerRowIdx>=0){if(!outputRows[headerRowIdx])outputRows[headerRowIdx]=[];outputRows[headerRowIdx][exportDirectionIdx]='Direction';outputRows[headerRowIdx][exportGatewayIdx]='Gateway';}const dataMap=new Map();selectionBatches.forEach(batch=>batch.zones.forEach(zoneId=>dataMap.set(zoneId,{Direction:batch.direction,Gateway:batch.gateway})));if(usingLoadedColumns){for(let i=startRow-1;i<outputRows.length;i++){if(!outputRows[i])outputRows[i]=[];outputRows[i][exportDirectionIdx]='';outputRows[i][exportGatewayIdx]='';}}for(let i=startRow-1;i<outputRows.length;i++){const rowId=String(outputRows[i][zoneColIdx]??'').trim();if(dataMap.has(rowId)){const match=dataMap.get(rowId);outputRows[i][exportDirectionIdx]=match.Direction;outputRows[i][exportGatewayIdx]=match.Gateway;}}const csv=Papa.unparse(outputRows);const blob=new Blob([csv],{type:'text/csv'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`${document.getElementById('filename-input').value||'distribution_results'}.csv`;a.click();}});});
+</script>
+</body>
+</html>
